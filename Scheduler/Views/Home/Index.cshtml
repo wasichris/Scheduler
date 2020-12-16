@@ -1,0 +1,145 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+
+    <div id="app">
+        <h1 class="display-4">System Scheduler</h1>
+        <div class="scheduler-actions">
+            <button v-on:click="startScheduler" :disabled="!isSchedulerStop">Start Scheduler</button>
+            <button v-on:click="stopScheduler" :disabled="isSchedulerStop">Stop Scheduler</button>
+            <button v-on:click="refresh">Refresh {{counter}}</button>
+        </div>
+
+        <table class="schedule-table">
+            <thead class="schedule-table__header">
+                <tr>
+                    <td align="center">
+                        Job Name
+                    </td>
+                    <td align="center">
+                        Job Type
+                    </td>
+                    <td align="center">
+                        CRON
+                    </td>
+                    <td align="center">
+                        Status
+                    </td>
+                    <td>
+                        Actions
+                    </td>
+                </tr>
+            </thead>
+            <tr v-for="(job,index) in jobs" :key="index">
+                <td align="center">
+                    {{job.jobName}}
+                </td>
+                <td align="center">
+                    {{job.jobType}}
+                </td>
+                <td align="center">
+                    {{job.cronExpression}}
+                </td>
+                <td align="center" :class="isExecuting(job.jobStatusId) ? 'schedule-table--active' : ''">
+                    {{job.jobStatusName}}
+                </td>
+                <td>
+                    <button v-on:click="()=>trigger(job.jobName)" :disabled="!isStandby(job.jobStatusId)">Trigger</button>
+                    <button v-on:click="()=>Interrupt(job.jobName)" :disabled="!isExecuting(job.jobStatusId)">Interrupt</button>
+                </td>
+            </tr>
+        </table>
+
+        <div class="scheduler-actions">
+             {{time}}
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+
+    var app = new Vue({
+        el: '#app',
+        data: {
+            connection: null,
+            jobs: [],
+            counter: 0,
+            time: '',
+            timeInterval: null
+        },
+        async mounted() {
+
+            this.connection = new signalR.HubConnectionBuilder()
+                .withUrl("/schedulerHub")
+                .build();
+
+            // 被後端呼叫接收 Job 目前狀態
+            this.connection.on("ReceiveJobStatus", (jobs) => {
+                this.jobs = jobs;
+                this.counter += 1;
+            });
+
+            // 被後端呼叫接收 Job 狀態改變的通知
+            this.connection.on("JobStatusChange", () => {
+                this.connection.invoke("RequestJobStatus").catch(err => console.error(err));
+            });
+
+            this.connection.start().catch(err => console.error(err));
+
+            this.time = this.getTime();
+            this.timeInterval = window.setInterval(() => this.time = this.getTime(), 300);
+        },
+        destroyed() {
+            window.clearInterval(this.timeInterval);
+        },
+        computed: {
+            isSchedulerStop() {
+                return this.jobs.findIndex(j => j.jobStatusId === 3) > -1
+            }
+        },
+        methods: {
+            isExecuting(status) {
+                return status === 2;
+            },
+            isStandby(status) {
+                return status === 1;
+            },
+            refresh() {
+                // 呼叫後端提供所有 Job 的狀態
+                this.connection.invoke("RequestJobStatus").catch(err => console.error(err));
+            },
+            trigger(jobName) {
+                // 呼叫後端觸發特定Job
+                this.connection.invoke("TriggerJob", jobName).catch(err => console.error(err));
+            },
+            Interrupt(jobName) {
+                // 呼叫後端終止特定Job
+                this.connection.invoke("InterruptJob", jobName).catch(err => console.error(err));
+            },
+            startScheduler() {
+                // 呼叫後端啟動排程
+                this.connection.invoke("StartScheduler").catch(err => console.error(err));
+            },
+            stopScheduler() {
+                // 呼叫後端終止排程
+                this.connection.invoke("StopScheduler").catch(err => console.error(err));
+            },
+            getTime() {
+                var dt = new Date();
+                var DD = ("0" + dt.getDate()).slice(-2);
+                var MM = ("0" + (dt.getMonth() + 1)).slice(-2);
+                var YYYY = dt.getFullYear();
+                var hh = ("0" + dt.getHours()).slice(-2);
+                var mm = ("0" + dt.getMinutes()).slice(-2);
+                var ss = ("0" + dt.getSeconds()).slice(-2);
+                return YYYY + "-" + MM + "-" + DD + " " + hh + ":" + mm + ":" + ss;
+            }
+        }
+    });
+
+
+</script>
