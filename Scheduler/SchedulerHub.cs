@@ -51,7 +51,7 @@ namespace Scheduler
         {
             if (Clients != null)
             {
-                await Clients.Caller.SendAsync("JobStatusChange");
+                await Clients.All.SendAsync("JobStatusChange");
             }
         }
 
