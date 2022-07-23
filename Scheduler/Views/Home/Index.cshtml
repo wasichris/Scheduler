@@ -62,14 +62,15 @@
 <script>
 
 
-    var app = new Vue({
-        el: '#app',
-        data: {
-            connection: null,
-            jobs: [],
-            counter: 0,
-            time: '',
-            timeInterval: null
+ var app = Vue.createApp({
+        data() {
+            return {
+                connection: null,
+                jobs: [],
+                counter: 0,
+                time: '',
+                timeInterval: null
+            }
         },
         async mounted() {
 
@@ -139,7 +140,6 @@
                 return YYYY + "-" + MM + "-" + DD + " " + hh + ":" + mm + ":" + ss;
             }
         }
-    });
-
+    }).mount('#app');
 
 </script>
